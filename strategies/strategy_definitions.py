@@ -1,3 +1,17 @@
+"""
+Strategy Definitions - Master Dictionary of All Trading Strategies
+
+This file contains structured definitions for all strategies.
+These are blueprints that the strategy execution engine reads.
+
+Structure:
+- STRATEGIES: Daily/swing strategies (MA101, Swing, Qullamaggie, Donchian, QMom)
+- OPTIONS_EXECUTION_OVERLAY: Options execution rules
+- TREND_STRATEGIES: Trend-following strategies (Covel, SMB intraday)
+"""
+
+
+
 STRATEGIES = {
   "moving_averages_101_burns_2015": {
     "meta": {
