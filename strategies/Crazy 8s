@@ -1,0 +1,905 @@
+STRATEGIES = {
+  "moving_averages_101_burns_2015": {
+    "meta": {
+      "name": "Moving Averages 101 - Trend/Crossover Framework (Burns)",
+      "source_file": "Moving-Averages-101.pdf",
+      "source_citations": ["[file:1]"],
+      "asset_class": "Equities/ETFs (daily)",
+      "timeframe": "1D",
+      "style": "Trend-following (moving-average regime + crossover entries + MA/RSI-based exits)"
+    },
+    "structured_rule_set_if_then": [
+      "IF Close > SMA(200) THEN regime = 'long_only' ELSE regime = 'no_long_or_short_only' (optional). [file:1]",
+      "IF regime == 'long_only' AND (EMA(short) crosses above EMA(long)) THEN enter long at next open (or on close, configurable). [file:1]",
+      "IF in_long AND Close closes below chosen 'key MA' THEN exit long (EOD stop). [file:1]",
+      "IF in_long AND RSI >= overbought_threshold THEN take profits / tighten trailing stop (configurable). [file:1]",
+      "IF in_long AND volatility is high and price repeatedly pierces the fast MA (noise regime) THEN reduce trading / widen MA lengths / stand aside (filter). [file:1]"
+    ],
+    "required_data": {
+      "bars": ["daily OHLCV"],
+      "indicators": [
+        "SMA(50), SMA(100), SMA(200) (trend context/support-resistance usage). [file:1]",
+        "EMA(5), EMA(10), EMA(21) (momentum/trailing stop usage). [file:1]",
+        "RSI(14) (overbought/oversold profit-taking filter). [file:1]",
+        "MACD(12,26,9) (optional confirmation filter). [file:1]"
+      ]
+    },
+    "entry_conditions_specific_testable": {
+      "long_entries": [
+        {
+          "name": "MA crossover (baseline)",
+          "logic": [
+            "Require Close > SMA(200). [file:1]",
+            "Signal: EMA(short_len) crosses above EMA(long_len). [file:1]"
+          ],
+          "default_params": {"short_len": 10, "long_len": 30},
+          "order_timing": "enter_next_open_or_close",
+          "notes": "The text highlights crossover systems and gives a 10/30 EMA crossover example as a simple trend-following approach. [file:1]"
+        },
+        {
+          "name": "Break-and-close above key MA (momentum ignition)",
+          "logic": [
+            "Signal: Close crosses above selected MA (e.g., SMA(200) or SMA(50)) AND closes above it. [file:1]",
+            "Optional: require RSI <= 65 to avoid entering overly extended conditions. [file:1]"
+          ],
+          "default_params": {"key_ma": "SMA200", "rsi_max": 65}
+        }
+      ],
+      "short_entries_optional": [
+        {
+          "name": "Short only in bear regime",
+          "logic": [
+            "Require Close < SMA(200) (bear regime). [file:1]",
+            "Signal: EMA(short_len) crosses below EMA(long_len) OR Close breaks below key MA and closes below it. [file:1]"
+          ],
+          "default_params": {"short_len": 10, "long_len": 30}
+        }
+      ]
+    },
+    "exit_conditions_stops_targets_time": {
+      "hard_stops": [
+        "Exit long if Close < chosen stop_MA (end-of-day close-based stop). [file:1]"
+      ],
+      "trailing_stops": [
+        "After profit extension, trail using faster MAs (e.g., move stop from SMA(200)->SMA(50)->EMA(10)->EMA(5) as trend matures). [file:1]",
+        "Alternative trailing stop: previous day low (for longs) as a close-based or intraday rule. [file:1]"
+      ],
+      "profit_targets": [
+        "Optional profit-taking when RSI approaches ~70 (typical overbought reference in the text). [file:1]"
+      ],
+      "time_based": [
+        "Optional time stop: exit if no progress after N bars (the text discusses time-based stop concepts generally). [file:1]"
+      ]
+    },
+    "position_sizing_rules": {
+      "risk_per_trade": "Target ~1% account risk per trade (position size derived from entry-to-stop distance). [file:1]",
+      "sizing_method": [
+        "shares = floor((equity * risk_pct) / (entry_price - stop_price)). [file:1]",
+        "Use smaller size in higher volatility instruments; short-term MA systems are vulnerable to volatility/noise. [file:1]"
+      ],
+      "default_params": {"risk_pct": 0.01}
+    },
+    "parameters_to_optimize": [
+      "Regime filter MA length (e.g., 200 vs 250). [file:1]",
+      "Crossover pair (e.g., 10/30 EMA, 10/50 EMA, 50/200 SMA, etc.). [file:1]",
+      "Stop style: close-below-MA vs percent-below-MA vs previous-low vs ATR-based. [file:1]",
+      "RSI filters (entry rsi_max; exit rsi_takeprofit). [file:1]",
+      "MACD confirmation on/off. [file:1]"
+    ],
+    "implementation_notes": {
+      "assumptions": [
+        "Use adjusted prices for indicators when trading equities.",
+        "Define cross as: yesterday short<=long and today short>long (and reverse for cross down)."
+      ]
+    }
+  },
+
+  "ultimate_guide_swing_trading_burns_2021_trend_variant": {
+    "meta": {
+      "name": "Ultimate Guide to Swing Trading - Trend/Swing Hybrid (Burns)",
+      "source_file": "Ultimate-Guide-to-Swing-Trading.pdf",
+      "source_citations": ["[file:2]"],
+      "asset_class": "Equities/ETFs (daily)",
+      "timeframe": "1D",
+      "style": "Swing trading mechanics applied to trend-following (MA cross + RSI profit-taking)"
+    },
+    "structured_rule_set_if_then": [
+      "IF market environment is 'bull' (uptrend context) THEN prefer long signals; IF 'bear' THEN prefer short signals; IF 'sideways' THEN use mean-reversion/range signals (optional). [file:2]",
+      "IF EMA(5) crosses above EMA(20) THEN enter long; IF EMA(5) crosses below EMA(20) THEN exit long (trend version) OR take profits earlier via RSI (swing version). [file:2]",
+      "IF using swing-style profit-taking THEN exit/trim as RSI approaches 70 (example given for swing trader). [file:2]",
+      "IF buying-the-dip within an uptrend THEN use bounces around 50-day MA or deeper 200-day MA with close-based invalidation. [file:2]",
+      "IF volatility expands (ATR rises sharply) THEN reduce position size and/or shorten holding expectations. [file:2]"
+    ],
+    "required_data": {
+      "bars": ["daily OHLCV"],
+      "indicators": [
+        "EMA(5), EMA(20) crossover framework. [file:2]",
+        "SMA(50) and SMA(200) for dip-buy levels and context. [file:2]",
+        "RSI(14) for overbought/oversold and profit-taking targets. [file:2]",
+        "ATR(14) for volatility-aware sizing. [file:2]"
+      ]
+    },
+    "entry_conditions_specific_testable": {
+      "long_entries": [
+        {
+          "name": "5/20 EMA trend entry",
+          "logic": [
+            "Signal: EMA(5) crosses above EMA(20). [file:2]"
+          ],
+          "order_timing": "enter_on_close_or_next_open",
+          "default_params": {"fast": 5, "slow": 20}
+        },
+        {
+          "name": "50-day dip-buy (trend-context pullback)",
+          "logic": [
+            "Price interacts with SMA(50) and closes above it (or dips below intraday but closes back above). [file:2]"
+          ],
+          "order_timing": "enter_on_close",
+          "default_params": {"ma_len": 50}
+        },
+        {
+          "name": "200-day deep dip-buy (bull-market defense line concept applied to swing)",
+          "logic": [
+            "Price interacts with SMA(200) and closes above it (or regains it on next day close). [file:2]"
+          ],
+          "order_timing": "enter_on_close",
+          "default_params": {"ma_len": 200}
+        }
+      ]
+    },
+    "exit_conditions_stops_targets_time": {
+      "hard_stops": [
+        "For MA dip-buy: exit on Close < the MA used for entry context (e.g., Close < SMA(50) or Close < SMA(200)). [file:2]"
+      ],
+      "trend_exit": [
+        "Exit long when EMA(5) crosses below EMA(20) (trend version). [file:2]"
+      ],
+      "profit_targets": [
+        "Swing-style: take profits (or partials) around RSI~70. [file:2]"
+      ],
+      "trailing_stops": [
+        "Optional: tighten trailing stop to a short MA (e.g., EMA(5) or EMA(10)) after price rallies. [file:2]"
+      ],
+      "time_based": [
+        "Optional: exit if trade goes sideways too long (time stop concept described). [file:2]"
+      ]
+    },
+    "position_sizing_rules": {
+      "risk_per_trade": "Use percent-of-equity risk; reduce size in higher ATR conditions. [file:2]",
+      "atr_normalization": "If two instruments have different ATR (e.g., ATR 10 vs ATR 5 at same price), size the higher-ATR instrument smaller (example principle given). [file:2]",
+      "default_params": {"risk_pct": 0.01, "atr_len": 14}
+    },
+    "parameters_to_optimize": [
+      "EMA lengths for crossover (e.g., 5/20 vs 5/30). [file:2]",
+      "Profit-taking threshold (RSI 65/70/75). [file:2]",
+      "MA dip-buy choice (SMA vs EMA; 50 vs 100 vs 200). [file:2]",
+      "ATR-based sizing scalar and/or stop distance. [file:2]",
+      "Time stop bars. [file:2]"
+    ],
+    "implementation_notes": {
+      "assumptions": [
+        "This is a trend-following adaptation; the book distinguishes swing trading vs trend trading and illustrates earlier exits for swing traders (e.g., RSI-based). [file:2]"
+      ]
+    }
+  },
+
+  "qullamaggie_plan_suite_202x": {
+    "meta": {
+      "name": "Qullamaggie Trading System - HTF/EP/VCP Trend Continuations",
+      "source_file": "Qullamaggie_Trading_System.pdf",
+      "source_citations": ["[file:3]"],
+      "asset_class": "Equities (leaders), some intraday for EP",
+      "timeframe": "Daily for setup + breakout; EP uses ORH intraday",
+      "style": "Trend-following (breakout/continuation in leaders with strict risk control)"
+    },
+    "sub_strategies": {
+      "HTF_high_tight_flag": {
+        "structured_rule_set_if_then": [
+          "IF NASDAQ 10-day MA and 20-day MA are both rising THEN allowed_to_trade = True ELSE reduce size or stay in cash. [file:3]",
+          "IF stock is a strong leader (1M/3M/6M change thresholds) AND avg daily dollar volume >= 50M AND price above rising 50-day MA THEN eligible. [file:3]",
+          "IF 'pole' advance ~90-100% within ~8 weeks AND 'flag' retrace <= ~25% with volume contraction ~50% AND tight near 10/20-day MAs THEN setup_valid. [file:3]",
+          "IF setup_valid AND price breaks above flag high on ~150% of average volume THEN enter long. [file:3]",
+          "IF in_trade AND Close < 10EMA or Close < 20SMA THEN exit (management/stop rule). [file:3]"
+        ],
+        "required_data": {
+          "bars": ["daily OHLCV"],
+          "indicators": [
+            "NASDAQ proxy series + MA(10), MA(20) slope check. [file:3]",
+            "Stock MA(10 EMA), MA(20 SMA), MA(50). [file:3]",
+            "Volume vs average volume (for 150% breakout confirmation). [file:3]",
+            "Percent change lookbacks for leader filters (1M/3M/6M). [file:3]"
+          ]
+        },
+        "entry_conditions_specific_testable": {
+          "long_entry": {
+            "trigger": "Buy stop above flag_high (or market on breakout close). [file:3]",
+            "volume_confirmation": "Breakout day volume >= 1.5 * avg_volume_N (N configurable). [file:3]"
+          }
+        },
+        "exit_conditions_stops_targets_time": {
+          "initial_stop": "Stop at low of breakout day. [file:3]",
+          "trend_stop": "Exit on close below 10EMA/20SMA (rule explicitly stated). [file:3]",
+          "partial_profit": "Take ~25% profits at ~2-3R, trail remainder by 10EMA. [file:3]"
+        },
+        "position_sizing_rules": {
+          "risk_per_trade": "~1% of account per trade (stated). [file:3]",
+          "shares_formula": "shares = floor((equity * 0.01) / (entry_price - stop_price)). [file:3]"
+        },
+        "parameters_to_optimize": [
+          "Average volume lookback for the 150% filter. [file:3]",
+          "Definition thresholds for pole/flag (% move, weeks, retrace %, volume contraction). [file:3]",
+          "Exit: close<10EMA vs close<20SMA vs both. [file:3]",
+          "Partial take-profit fraction and R-multiple level (e.g., 2R vs 3R). [file:3]"
+        ]
+      },
+
+      "EP_episodic_pivot": {
+        "structured_rule_set_if_then": [
+          "IF NASDAQ 10-day MA and 20-day MA are rising THEN trade_allowed = True ELSE reduce size/cash. [file:3]",
+          "IF stock has strong catalyst (earnings/news) AND dollar volume >= 100M AND above 50-day MA THEN eligible. [file:3]",
+          "IF pre-market gap >= ~10% AND above MAs/resistance AND opening volume (first ~30 minutes) ~= full-day average THEN setup_valid. [file:3]",
+          "IF setup_valid AND break of ORH (1-, 5-, or 60-min ORH) with volume surge THEN enter. [file:3]",
+          "IF in_trade AND Close < 10EMA THEN hard exit. [file:3]"
+        ],
+        "required_data": {
+          "bars": ["daily OHLCV", "intraday (1m/5m/60m) for ORH"],
+          "indicators": [
+            "NASDAQ MA(10), MA(20) slope. [file:3]",
+            "Stock MA(50), MA(10 EMA). [file:3]",
+            "Gap % (today open vs prior close). [file:3]",
+            "Opening range high (ORH) and volume surge metrics. [file:3]"
+          ]
+        },
+        "entry_conditions_specific_testable": {
+          "long_entry": {
+            "trigger": "Buy on breakout above ORH (selected timeframe) with volume confirmation. [file:3]",
+            "confirmation": "Confirm close above ORH (optional rule). [file:3]"
+          }
+        },
+        "exit_conditions_stops_targets_time": {
+          "initial_stop": "Stop at low of day (LOD). [file:3]",
+          "partial_profit": "Trim ~25% at ~2-3R; trail remainder by 10EMA. [file:3]",
+          "hard_exit": "Exit on close below 10EMA. [file:3]"
+        },
+        "position_sizing_rules": {
+          "risk_per_trade": "0.5% to 1% of account (stated range). [file:3]"
+        },
+        "parameters_to_optimize": [
+          "Gap threshold (e.g., 8% vs 10% vs 12%). [file:3]",
+          "ORH timeframe selection (1m/5m/60m). [file:3]",
+          "Opening volume requirement definition. [file:3]",
+          "Trail MA length (10EMA vs 20SMA). [file:3]"
+        ]
+      },
+
+      "VCP_volatility_contraction_pattern": {
+        "structured_rule_set_if_then": [
+          "IF NASDAQ uptrend confirmed AND sector strong THEN trade_allowed = True. [file:3]",
+          "IF RS Rank >= ~90 AND price above 50- and 200-day MA THEN eligible. [file:3]",
+          "IF pattern shows ~3 contractions with successively tighter ranges AND volume declines on pullbacks AND tight near MAs THEN setup_valid. [file:3]",
+          "IF setup_valid AND breakout above last contraction with ~150% average volume THEN enter. [file:3]",
+          "IF in_trade AND Close breaks trailing MA (10EMA for volatile / 20SMA for slow) THEN exit (rule described). [file:3]"
+        ],
+        "required_data": {
+          "bars": ["daily OHLCV"],
+          "indicators": [
+            "MA(50), MA(200). [file:3]",
+            "MA(10 EMA) and/or MA(20 SMA) for trailing. [file:3]",
+            "Relative strength rank (or proxy via relative performance). [file:3]",
+            "Volume vs average volume. [file:3]"
+          ]
+        },
+        "entry_conditions_specific_testable": {
+          "long_entry": {
+            "trigger": "Buy stop above last-contraction high (breakout). [file:3]",
+            "volume_confirmation": "Volume >= 1.5 * avg_volume_N. [file:3]"
+          }
+        },
+        "exit_conditions_stops_targets_time": {
+          "initial_stop": "Stop at low of day (LOD) of breakout day. [file:3]",
+          "partial_profit": "Take ~25% at ~3R; rest on 10EMA break (as described). [file:3]",
+          "trailing_stop": "Trail by 10EMA (volatile) or 20SMA (slow). [file:3]"
+        },
+        "position_sizing_rules": {
+          "risk_per_trade": "~1% of account per trade (stated). [file:3]"
+        },
+        "parameters_to_optimize": [
+          "Number of contractions (2 vs 3 vs 4). [file:3]",
+          "Volume contraction threshold and volume breakout threshold. [file:3]",
+          "Trail choice: 10EMA vs 20SMA. [file:3]",
+          "Partial take-profit R-multiple and fraction. [file:3]"
+        ]
+      }
+    }
+  },
+
+  "buy_signals_sell_signals_burns_2015_donchian_breakout": {
+    "meta": {
+      "name": "Buy Signals / Sell Signals - Simple Trend Following Breakouts (Burns)",
+      "source_file": "Buy-signals-sell-signals_strategic-stock-market-entries-and-exits.pdf",
+      "source_citations": ["[file:4]"],
+      "asset_class": "Originally framed for diversified futures; adaptable to liquid ETFs/stocks",
+      "timeframe": "1D",
+      "style": "Trend-following (Donchian breakout) + ATR stop option + strict risk limits"
+    },
+    "structured_rule_set_if_then": [
+      "IF price makes a new N-day high THEN enter long; IF price makes a new N-day low THEN enter short (optional). [file:4]",
+      "IF long AND price makes a new M-day low THEN exit long (classic Donchian exit). [file:4]",
+      "IF short AND price makes a new M-day high THEN cover short. [file:4]",
+      "IF using ATR stop filter THEN set stop at k * ATR(lookback) from entry and trail (ATR-based stop approach described). [file:4]",
+      "IF risk per trade would exceed risk_cap THEN do not take signal (position sizing first principle). [file:4]"
+    ],
+    "required_data": {
+      "bars": ["daily OHLCV"],
+      "indicators": [
+        "DonchianChannelHigh(N), DonchianChannelLow(N) (highest high / lowest low). [file:4]",
+        "ATR(lookback) for optional 3*ATR stop filter. [file:4]"
+      ]
+    },
+    "entry_conditions_specific_testable": {
+      "parameter_sets": [
+        {
+          "name": "30/15 breakout",
+          "entry": "Enter long on 30-day breakout high; enter short on 30-day breakout low (optional). [file:4]",
+          "exit": "Exit/cover on 15-day breakout opposite direction. [file:4]",
+          "params": {"N": 30, "M": 15}
+        },
+        {
+          "name": "50/25 breakout",
+          "entry": "Enter long on 50-day breakout high; enter short on 50-day breakout low (optional). [file:4]",
+          "exit": "Exit/cover on 25-day breakout opposite direction. [file:4]",
+          "params": {"N": 50, "M": 25}
+        },
+        {
+          "name": "100/50 breakout",
+          "entry": "Enter long on 100-day breakout high; enter short on 100-day breakout low (optional). [file:4]",
+          "exit": "Exit/cover on 50-day breakout opposite direction. [file:4]",
+          "params": {"N": 100, "M": 50}
+        }
+      ],
+      "order_timing": "enter_on_breakout_close_or_next_open"
+    },
+    "exit_conditions_stops_targets_time": {
+      "donchian_exit": "Use M-day opposite breakout as the primary exit. [file:4]",
+      "atr_stop_optional": "Use 3 * ATR (based on ~100-day context as described) as a drawdown-reduction filter; trail as ATR changes. [file:4]",
+      "time_stop_optional": "Exit if trade stagnates for too long (time stop concept included). [file:4]"
+    },
+    "position_sizing_rules": {
+      "risk_per_trade_baseline": "Target ~1% equity risk per position (explicitly recommended as a simple risk control heuristic). [file:4]",
+      "turtles_related_constraints": [
+        "Turtles used increments of ~1% of account equity and capped any one trade loss (system constraint described). [file:4]"
+      ],
+      "default_params": {"risk_pct": 0.01, "atr_k": 3.0, "atr_len": 14}
+    },
+    "parameters_to_optimize": [
+      "Breakout windows (20/10, 30/15, 50/25, 55/20, 100/50 variants are listed). [file:4]",
+      "ATR length and ATR multiple k for stop. [file:4]",
+      "Long-only vs long/short. [file:4]",
+      "Signal timing: close-based confirmation vs intraday breakout. [file:4]"
+    ],
+    "implementation_notes": {
+      "assumptions": [
+        "Donchian definitions should exclude current bar when computing breakout thresholds (common backtest convention)."
+      ]
+    }
+  },
+
+  "quantitative_momentum_gray_vogel_2016_stock_selection_plus_trend_overlay": {
+    "meta": {
+      "name": "Quantitative Momentum - Cross-Sectional Momentum + Trend Overlay (Gray/Vogel)",
+      "source_file": "Quantitative-Momentum_-A-Practitioners-Guide-to-Building-a-Momentum-Based-Stock-Selection-System.pdf",
+      "source_citations": ["[file:5]"],
+      "asset_class": "Equities (systematic stock selection)",
+      "timeframe": "Monthly rebalance (stock selection) + daily monitoring optional",
+      "style": "Momentum investing with optional risk management via stop-loss or trend/time-series overlay"
+    },
+    "structured_rule_set_if_then": [
+      "IF rebalance_date THEN rank universe by past 12-month total return excluding most recent month (classic momentum definition discussed). [file:5]",
+      "IF stock is in top X% of momentum ranks THEN include in long portfolio (equal-weight baseline in discussed tests). [file:5]",
+      "IF using time-series momentum overlay THEN hold the momentum portfolio only when a broad index (e.g., S&P 500) has positive 12-month return relative to risk-free; ELSE allocate to cash/risk-free. [file:5]",
+      "IF using stop-loss overlay THEN monitor positions; if position declines by X% (e.g., 10% or 5% examples discussed) then exit to cash until next rebalance. [file:5]"
+    ],
+    "required_data": {
+      "bars": ["daily (for stop-loss monitoring)", "monthly endpoints (for ranking/rebalance)"],
+      "data_fields": [
+        "Total return series (price + dividends) for momentum ranking. [file:5]",
+        "Risk-free proxy (for time-series overlay rule described). [file:5]",
+        "Benchmark index total return (e.g., S&P 500) for time-series overlay described. [file:5]"
+      ],
+      "indicators": [
+        "Momentum score = return(t-12m, t-1m). [file:5]"
+      ]
+    },
+    "entry_conditions_specific_testable": {
+      "monthly_rebalance_entry": {
+        "logic": [
+          "At month-end, compute momentum score for all eligible stocks = trailing 12m return skipping most recent month. [file:5]",
+          "Select top decile (or configurable top X%). [file:5]",
+          "Equal-weight holdings (baseline used in described tests). [file:5]"
+        ],
+        "default_params": {"lookback_months": 12, "skip_recent_months": 1, "top_pct": 0.10, "weighting": "equal"}
+      }
+    },
+    "exit_conditions_stops_targets_time": {
+      "baseline_exit": [
+        "Exit/rotate at next monthly rebalance (sell names no longer in selected top bucket). [file:5]"
+      ],
+      "stop_loss_overlay_optional": [
+        "If any position declines by X% during the month, sell and hold cash until month-end (examples of 10% and 5% stop-loss rules discussed). [file:5]"
+      ],
+      "trend_overlay_optional": [
+        "If time-series rule says 'risk-off' then exit all equities and hold cash/risk-free until rule flips 'risk-on'. [file:5]"
+      ]
+    },
+    "position_sizing_rules": {
+      "baseline": "Equal-weight across selected winners (explicitly used in described portfolio tests). [file:5]",
+      "risk_controls": [
+        "Optional portfolio-level risk management is emphasized as a simpler alternative to daily stop-loss complexity in the discussion. [file:5]"
+      ]
+    },
+    "parameters_to_optimize": [
+      "Top selection fraction (top 5%, 10%, 20%). [file:5]",
+      "Lookback window and skip window (12-1 is baseline described; variations are common). [file:5]",
+      "Stop-loss X% if used (5% vs 10% examples). [file:5]",
+      "Rebalance frequency (monthly baseline in described tests). [file:5]",
+      "Trend/time-series overlay lookback (12-month used in example rule). [file:5]"
+    ],
+    "implementation_notes": {
+      "assumptions": [
+        "Universe definition (liquidity/market cap filters) must be specified in code; the text discusses practical implementation constraints broadly. [file:5]"
+      ]
+    }
+  }
+}
+OPTIONS_EXECUTION_OVERLAY = {
+  "options_80_delta_long_call_overlay": {
+    "meta": {
+      "name": "80-Delta Long Call Execution Overlay",
+      "instrument": "LONG_CALL",
+      "target_delta": 0.80,
+      "notes": [
+        "Options are derivatives; sizing and risk rules must account for premium potentially going to zero. [file:2][file:4]",
+        "Use expirations aligned with the strategy holding period. [file:2]",
+        "Avoid illiquid options / wide bid-ask spreads; stay closer to ATM/front month for liquidity where possible. [file:4]"
+      ]
+    },
+
+    "required_data": {
+      "underlying": ["daily OHLCV (same as strategy)"],
+      "options_chain": [
+        "Expiration date list (DTE).",
+        "Per-strike: delta, bid, ask, last, open_interest, volume (at minimum). [file:4]",
+        "Optional for better modeling: IV, theta, vega, gamma, mid price."
+      ],
+      "corporate_actions": ["earnings calendar (optional filter if you avoid holding through earnings)"]
+    },
+
+    "contract_selection_rules_if_then": [
+      "IF strategy_signal == 'ENTER_LONG' THEN select 1 call contract matching rules below.",
+      "Choose expiration with DTE in [min_dte, max_dte] where min/max are set per strategy timeframe (optimize). [file:2]",
+      "Within that expiration, choose strike whose delta is closest to target_delta (0.80) and within delta_tolerance.",
+      "Liquidity filter: require open_interest >= min_oi AND option_volume >= min_volume AND (ask-bid) <= max_spread AND mid_price >= min_premium. [file:4]",
+      "IF no contract passes filters THEN do not trade (skip signal)."
+    ],
+
+    "entry_execution": {
+      "timing": "Match underlying entry timing (e.g., next open, or on close).",
+      "order_type": "Limit at mid (default) or configurable slippage model.",
+      "fill_price_model": {
+        "default": "mid = (bid+ask)/2",
+        "alternatives": ["mid + slippage_ticks", "ask (worst-case buy fill)"]
+      }
+    },
+
+    "exit_execution": {
+      "primary_exit_driver": "Use the underlying strategy exit signal; when it triggers, close the call. [file:4]",
+      "order_type": "Limit at mid (default) or marketable limit; configurable.",
+      "early_exit_optional": [
+        "IF option bid-ask spread widens beyond max_spread_exit THEN exit at best available (or treat as 'no fill' per backtest policy). [file:4]"
+      ],
+      "exercise_assignment_policy": [
+        "Default: Do not exercise; close-to-close (sell-to-close) to avoid assignment handling in backtests."
+      ]
+    },
+
+    "risk_and_position_sizing": {
+      "risk_unit_definition": "Premium-at-risk (debit paid) unless you explicitly model stop-loss exits.",
+      "base_risk_per_trade_pct": 0.01,
+      "rules_if_then": [
+        "Set max_premium_risk = account_equity * base_risk_per_trade_pct. [file:4]",
+        "Contracts = floor(max_premium_risk / (option_entry_price * 100)).",
+        "IF Contracts < 1 THEN no trade (or allow fractional via synthetic sizing in analytics). [file:2][file:4]"
+      ],
+      "notes": [
+        "Burns emphasizes 1% risk per trade as a conservative default and highlights that options can go to zero, so sizing must reflect that. [file:2][file:4]"
+      ]
+    },
+
+    "stops_targets_time_exits_for_options": {
+      "default": "Use underlying-based exits from the base strategy.",
+      "optional_premium_stop": {
+        "enabled": False,
+        "stop_type": "premium_drawdown",
+        "stop_value": 0.50,
+        "rule": "IF option_mark_price <= entry_price * (1 - stop_value) THEN exit."
+      },
+      "optional_dte_exit": {
+        "enabled": True,
+        "min_dte_before_exit": 7,
+        "rule": "IF DTE <= min_dte_before_exit THEN exit (avoid last-week gamma/theta behavior) (parameter)."
+      }
+    },
+
+    "parameters_to_optimize": {
+      "delta_tolerance": [0.03, 0.05, 0.08],
+      "min_dte": [14, 21, 30, 45],
+      "max_dte": [30, 45, 60, 90],
+      "min_open_interest": [100, 250, 500, 1000],
+      "min_option_volume": [10, 25, 50, 100],
+      "max_spread": [0.05, 0.10, 0.20, 0.30],
+      "entry_fill_model": ["mid", "mid_plus_slippage", "ask"],
+      "exit_fill_model": ["mid", "mid_minus_slippage", "bid"],
+      "base_risk_per_trade_pct": [0.005, 0.01, 0.02],
+      "min_dte_before_exit": [3, 5, 7, 10],
+      "premium_stop_enabled": [False, True],
+      "premium_stop_value": [0.30, 0.50, 0.70]
+    }
+  }
+}
+TREND_STRATEGIES = {
+  # 1) Covel – generic weekly breakout trend-following (Sunrise / Clarke style)
+  "covel_weekly_channel_breakout_trend": {
+    "source": "The Little Book of Trading – Sunrise/Clarke style systems [file:6]",
+
+    "rules_if_then": [
+      "IF market passes portfolio filters (liquidity, marginability, diversification constraints) THEN include in tradable universe.",
+      "IF no open position AND price makes a new N-week high THEN generate long entry signal.",
+      "IF no open position AND price makes a new N-week low THEN generate short entry signal (if shorting allowed for that market).",
+      "IF in long AND price hits initial_stop_long THEN exit long.",
+      "IF in short AND price hits initial_stop_short THEN exit short.",
+      "IF in long AND price > entry AND trailing_stop_long moves up according to trailing rule THEN update stop.",
+      "IF in short AND price < entry AND trailing_stop_short moves down according to trailing rule THEN update stop.",
+      "IF in long AND price crosses below trailing_stop_long THEN exit long.",
+      "IF in short AND price crosses above trailing_stop_short THEN exit short.",
+      "IF open risk across portfolio exceeds max_portfolio_risk_pct THEN reject new entries.",
+      "IF volatility (ATR) for a market exceeds max_allowed_volatility_pct_of_price THEN reduce unit_size or skip trade."
+    ],
+
+    "required_data": {
+      "bars": "Daily OHLCV for all instruments (equities, futures, FX, etc.) [file:6]",
+      "indicators": [
+        "N-week high and N-week low (e.g., rolling 12-week extremes) [file:6]",
+        "ATR (Average True Range) over atr_lookback_days for position sizing and stops [file:6]",
+        "Optional: 6‑month breakout direction filter (trade long only if last 6‑month breakout was up, short only if it was down) [file:6]"
+      ],
+      "meta": [
+        "Instrument multipliers (e.g., futures contract value)",
+        "Point value and tick size",
+        "Margin requirements per instrument"
+      ]
+    },
+
+    "entry_conditions": {
+      "long_entry": {
+        "signal": "Close_today >= highest_close_over_last_N_weeks AND no_open_position",
+        "filters_if_then": [
+          "IF trade_direction_filter_enabled == True THEN only trade in direction of last M‑month breakout (e.g., 6‑month) [file:6]",
+          "IF instrument passes min_liquidity_filter (e.g., avg_volume >= min_avg_volume) THEN allow trade.",
+          "IF estimated_portfolio_risk_after_entry <= max_portfolio_risk_pct THEN allow trade.",
+          "IF volatility (ATR / price) <= max_volatility_pct THEN allow full unit; ELSE scale down or skip."
+        ],
+        "entry_price": "Use next-day market-on-open or market-on-close after breakout; backtests should specify convention.",
+        "position_side": "LONG"
+      },
+      "short_entry": {
+        "signal": "Close_today <= lowest_close_over_last_N_weeks AND no_open_position AND allow_shorts == True",
+        "filters_if_then": [
+          "Same as long_entry filters, but applied to short side and optional downtrend filter."
+        ],
+        "entry_price": "Next-day market-on-open or market-on-close after breakdown.",
+        "position_side": "SHORT"
+      }
+    },
+
+    "exit_conditions": {
+      "initial_stop": {
+        "long": "initial_stop_long = entry_price - k_atr_initial * ATR(entry_bar) [file:6]",
+        "short": "initial_stop_short = entry_price + k_atr_initial * ATR(entry_bar)",
+        "execution": "Hard stop; exit at stop level or next available price."
+      },
+      "trailing_stop": {
+        "long": "trailing_stop_long = max(trailing_stop_long, close_today - k_atr_trail * ATR_today)",
+        "short": "trailing_stop_short = min(trailing_stop_short, close_today + k_atr_trail * ATR_today)",
+        "logic_if_then": [
+          "IF in long AND close_today - k_atr_trail*ATR_today > trailing_stop_long THEN move trailing_stop_long up.",
+          "IF in short AND close_today + k_atr_trail*ATR_today < trailing_stop_short THEN move trailing_stop_short down."
+        ]
+      },
+      "channel_exit_optional": {
+        "enabled": False,
+        "long_exit_signal": "Close_today <= lowest_close_over_last_exit_N_weeks",
+        "short_exit_signal": "Close_today >= highest_close_over_last_exit_N_weeks"
+      },
+      "time_exit_optional": {
+        "enabled": False,
+        "rule": "IF trade_duration_bars >= max_holding_bars AND no active stop hit THEN exit at market."
+      }
+    },
+
+    "position_sizing": {
+      "risk_unit_definition": "Risk is distance from entry to stop in price terms times position size.",
+      "per_trade_risk_pct": 0.01,
+      "sizing_rule": [
+        "dollars_at_risk_per_trade = account_equity * per_trade_risk_pct.",
+        "unit_size_contracts_or_shares = floor(dollars_at_risk_per_trade / (abs(entry_price - initial_stop_price) * contract_multiplier)). [file:6]",
+        "IF unit_size < 1 THEN no trade (or track as theoretical).",
+        "Optional: allow up to max_units_per_market using pyramiding rule below."
+      ],
+      "pyramiding_optional": {
+        "enabled": True,
+        "max_units_per_market": 4,
+        "add_unit_rule_if_then": [
+          "IF in_long AND open_profit >= add_unit_trigger_atr_multiple * ATR AND current_units < max_units_per_market THEN add one more unit with stop for entire position recalculated or kept at most conservative stop.",
+          "Symmetric rule for shorts."
+        ]
+      },
+      "portfolio_risk_limits": {
+        "max_portfolio_risk_pct": 0.20,
+        "max_correlation_bucket_risk_pct": 0.10
+      }
+    },
+
+    "parameters_to_optimize": {
+      "N_weeks_breakout": [8, 12, 16, 20, 26],
+      "exit_N_weeks_channel": [4, 8, 10, 12],
+      "atr_lookback_days": [14, 20, 30],
+      "k_atr_initial": [1.5, 2.0, 2.5, 3.0],
+      "k_atr_trail": [2.0, 2.5, 3.0, 4.0],
+      "per_trade_risk_pct": [0.005, 0.01, 0.02],
+      "max_units_per_market": [1, 2, 4],
+      "add_unit_trigger_atr_multiple": [0.5, 1.0, 1.5],
+      "max_portfolio_risk_pct": [0.15, 0.20, 0.25],
+      "max_volatility_pct": [0.03, 0.05, 0.08],
+      "min_avg_volume": [100000, 500000, 1000000]
+    }
+  },
+
+  # 2) Bella – intraday trend-trend “Second Day Play” short (PlayBook)
+  "smb_second_day_trend_trend_short": {
+    "source": "The PlayBook – EDU Second Day Play example [file:7]",
+
+    "rules_if_then": [
+      "IF stock had a large negative news shock yesterday AND trended down hard AND closed near its low on extreme volume THEN candidate for Second Day trend-trend short. [file:7]",
+      "IF today’s tape confirms weakness below key prior-day levels (especially prior-day low) THEN enter short at defined intraday pattern (e.g., hold below prior low with seller on the offer). [file:7]",
+      "IF price reclaims and holds above invalidation level (e.g., prior-day low or intraday lower-high level) on volume THEN cover short (stop).",
+      "IF stock accelerates into capitulative volume spike at intraday extension and then stops going down (finishing print) THEN optionally take partial profit but keep core until clear Reason2Cover. [file:7]"
+    ],
+
+    "required_data": {
+      "bars": "1‑minute and daily OHLCV for the stock and SPY (for context). [file:7]",
+      "indicators": [
+        "Prior-day intraday high, low, VWAP, and key consolidation range boundaries. [file:7]",
+        "Today’s intraday high/low, volume spikes, and consolidation ranges.",
+        "Optional: intraday ATR or range statistics."
+      ],
+      "news": [
+        "Structured news flags for: severe negative catalyst (e.g., SEC investigation, downgrade, fraud allegations) and classification as ‘Stock In Play’. [file:7]"
+      ],
+      "tape": "Level II and time-and-sales (prints, sizes, repeated sellers/buyers at key prices). [file:7]"
+    },
+
+    "entry_conditions": {
+      "setup_filters": [
+        "Yesterday: %Change <= -5% (down at least −5%). [file:7]",
+        "Yesterday: closing_price within close_to_low_pct (e.g., last_close <= low_yesterday * (1 + 0.02)). [file:7]",
+        "Yesterday: volume_yesterday >= volume_multiple * avg_20d_volume (e.g., >= 5x). [file:7]",
+        "Yesterday: intraday structure was persistent downtrend with weak bounces (not choppy mean reversion). [file:7]"
+      ],
+      "key_levels_from_yesterday": [
+        "prior_low = low_yesterday.",
+        "midday_range_low, midday_range_high = main consolidation range.",
+        "inflection_levels = prices with heavy volume traded (volume nodes). [file:7]"
+      ],
+      "intraday_short_triggers": [
+        {
+          "name": "Break_and_hold_below_prior_low",
+          "signal_if_then": [
+            "IF price trades below prior_low THEN wait_for_retention = True.",
+            "IF after_break price retests prior_low from below and fails to reclaim on repeated selling at or below prior_low THEN short_entry = best_bid_or_small_pullback. [file:7]"
+          ]
+        },
+        {
+          "name": "Hold_offer_at_new_intraday_low",
+          "signal_if_then": [
+            "IF new_intraday_low is formed AND stock consolidates just under that low with a seller holding the offer (offer_reload) and minimal bid follow‑through up THEN enter short against that offer with stop just above consolidation. [file:7]"
+          ]
+        }
+      ],
+      "market_alignment": [
+        "IF SPY is not strongly trending against trade (e.g., SPY not in strong uptrend making new intraday highs) THEN full size allowed; ELSE reduce size or skip. [file:7]"
+      ],
+      "entry_price": "Use marketable order into the break/hold pattern; log actual fill price.",
+      "position_side": "SHORT"
+    },
+
+    "exit_conditions": {
+      "hard_stop": {
+        "rule_if_then": [
+          "Primary invalidation: reclaim and hold above prior_low with buyers absorbing and printing above level for min_hold_bars (e.g., 3–5 bars on 1‑min). [file:7]",
+          "Secondary invalidation: reclaim and hold above latest lower-high consolidation that preceded current leg. [file:7]"
+        ],
+        "stop_placement": "Initial stop slightly above prior_low or above local consolidation high (e.g., 5–15 cents buffer depending on stock price and liquidity)."
+      },
+      "reason2cover_framework": {
+        "examples_if_then": [
+          "IF capitulative volume spike prints at new low with no further downside follow-through and price then bases and begins to make higher lows THEN take partial or full profits.",
+          "IF tape shifts from one-way selling to two-sided with strong bids stepping up and holding THEN reduce or exit.",
+          "IF SPY reverses into strong uptrend against short and stock stops making new lows THEN tighten stop or exit.",
+          "IF end_of_day_time (e.g., last_5_minutes) AND position still on with no strong new signal THEN cover intraday short."
+        ]
+      },
+      "scaling": {
+        "take_profits_if_then": [
+          "IF move_in_favor >= first_target_R (e.g., 1.5R) THEN cover_part_pct (e.g., 1/3–1/2) and trail stop above last lower high for remainder.",
+          "IF new impulse leg begins (break of intraday consolidation to downside) THEN consider adding with new local stop."
+        ]
+      },
+      "time_exit": {
+        "rule": "Flat by end_of_day_close; no overnight holds for this pure intraday implementation."
+      }
+    },
+
+    "position_sizing": {
+      "risk_unit_definition": "R = (entry_price - stop_price) for a short; per_trade_dollar_risk = account_equity * risk_pct.",
+      "per_trade_risk_pct": 0.005,
+      "sizing_rule": [
+        "per_trade_dollar_risk = account_equity * per_trade_risk_pct.",
+        "shares = floor(per_trade_dollar_risk / (entry_price - stop_price)).",
+        "IF shares > max_shares_per_tier THEN cap at max_shares_per_tier (can be calibrated per symbol liquidity)."
+      ],
+      "intraday_risk_limits": {
+        "max_daily_drawdown_pct": 0.03,
+        "max_concurrent_positions": 3,
+        "max_sector_exposure_pct": 0.15
+      }
+    },
+
+    "parameters_to_optimize": {
+      "close_to_low_pct": [0.01, 0.02, 0.03],
+      "volume_multiple": [3.0, 5.0, 10.0],
+      "min_yesterday_move_pct": [-5.0, -8.0, -10.0],
+      "per_trade_risk_pct": [0.003, 0.005, 0.01],
+      "max_shares_per_tier": [1000, 2000, 5000],
+      "min_hold_bars_for_reclaim": [3, 5, 7],
+      "first_target_R": [1.0, 1.5, 2.0],
+      "partial_profit_pct": [0.33, 0.5, 0.66]
+    }
+  },
+
+  # 3) Bella – intraday trend / Trades2Hold framework (trend-following within the day)
+  "smb_intraday_trades2hold_trend": {
+    "source": "One Good Trade + The PlayBook – intraday trend following, AM/Close focus, Trades2Hold [file:7][file:8]",
+
+    "rules_if_then": [
+      "IF stock is ‘In Play’ today (fresh meaningful news, large gap, or sector/ETF in strong trend) THEN consider it for Trades2Hold. [file:7][file:8]",
+      "IF intraday confirms a clear trend (higher highs/higher lows for uptrend; lower highs/lower lows for downtrend) AND price respects key levels (inflection prices with heavy volume) THEN look for pullback entries in direction of trend. [file:8]",
+      "IF intraday trend breaks (e.g., break of trendline plus failure to reclaim, or lower low in an uptrend) THEN exit core position. [file:8]",
+      "IF time_of_day in Midday_window AND no A+ pattern present THEN trade smaller or not at all; focus on scouting levels for the Close. [file:8]"
+    ],
+
+    "required_data": {
+      "bars": "1‑minute and daily OHLCV for stocks and SPY; optional sector ETF bars. [file:8]",
+      "indicators": [
+        "Intraday swing highs and lows for trend structure.",
+        "VWAP.",
+        "Key static levels: prior-day high/low/close, premarket high/low, overnight levels. [file:7][file:8]",
+        "Optional: simple moving averages on intraday (e.g., 20 / 50 EMA) for trend visualisation."
+      ],
+      "news": [
+        "Intraday fundamental tags: earnings, guidance change, major downgrade/upgrade, M&A, regulatory events, or macro catalysts. [file:7][file:8]"
+      ],
+      "tape": "Level II and time-and-sales for reading strength of bids/offers at levels and spotting ‘stocks not going down’ behavior. [file:7]"
+    },
+
+    "entry_conditions": {
+      "stock_in_play_filters": [
+        "gap_pct_abs >= min_gap_pct OR intraday_range_to_avg_range_ratio >= min_range_multiple. [file:8]",
+        "today_volume_projected >= vol_multiple * avg_20d_volume.",
+        "news_importance_tag in {‘major’, ‘structural’, ‘earnings’, ‘guidance’, ‘SEC_investigation’, ‘FDA’, ‘M&A’} OR stock is a high-beta leader in strong sector trend. [file:7][file:8]"
+      ],
+
+      "long_trend_entry": {
+        "trend_definition": [
+          "Uptrend: sequence of higher swing highs and higher swing lows on 1–5 min bars AND price above VWAP or above key morning inflection level. [file:8]"
+        ],
+        "entry_patterns_if_then": [
+          "IF price breaks above major level (premarket high, prior-day high, or multi-hour consolidation high) on volume and then pulls back to test that level from above and holds (bids step up, offers get lifted) THEN enter long against that level. [file:7][file:8]",
+          "IF bullish flag / tight consolidation forms after a strong impulse leg and resolves with a high-volume break in direction of the impulse THEN enter long on the break or first pullback. [file:7][file:8]"
+        ],
+        "entry_price": "Use marketable order near level with stop set just below level/flag low.",
+        "side": "LONG"
+      },
+
+      "short_trend_entry": {
+        "trend_definition": [
+          "Downtrend: sequence of lower highs and lower lows AND price below VWAP or under key breakdown level. [file:8]"
+        ],
+        "entry_patterns_if_then": [
+          "IF price breaks below major support (prior low / premarket low / multi-hour base) on strong selling and then retests from below and fails (offers hold, bids get hit) THEN enter short against that level. [file:7][file:8]",
+          "IF bearish flag / tight consolidation forms after strong down impulse and breaks lower with volume THEN enter short on break or first bounce back into flag underside."
+        ],
+        "entry_price": "Use marketable order near level with stop just beyond the level/flag high.",
+        "side": "SHORT"
+      },
+
+      "time_of_day_scaling": [
+        "Open_window (first 60–90 minutes): allow larger initial size when A+ setup present. [file:8]",
+        "Midday_window: reduce size; only take best setups or scale around existing core. [file:8]",
+        "Close_window (last 60–90 minutes): re-engage for Trades2Hold when trend intact; can add size with defined risk."
+      ]
+    },
+
+    "exit_conditions": {
+      "initial_stop": {
+        "rule": "Place stop just beyond the structural level that defines thesis (e.g., below breakout level or below flag low for longs; above breakdown level / flag high for shorts).",
+        "buffer": "Price_buffer = level * stop_buffer_pct or fixed cents based on volatility."
+      },
+      "trend_break_exit": {
+        "long_if_then": [
+          "IF in_long AND price makes a lower low relative to last meaningful swing low AND fails to reclaim support on retest THEN exit (trend broken). [file:8]"
+        ],
+        "short_if_then": [
+          "IF in_short AND price makes a higher high relative to last meaningful swing high AND fails to roll back over THEN exit."
+        ]
+      },
+      "scale_out_rules": [
+        "IF move_in_favor reaches first_R_multiple (e.g., 1R) THEN take_partials_pct (e.g., 1/3) and move stop to breakeven or better.",
+        "IF additional impulse legs form with small pullbacks (trend strengthening) THEN consider adding back into pullbacks while keeping overall risk within per_trade and daily limits."
+      ],
+      "time_exit": {
+        "intraday_only_mode": "Flat by market close.",
+        "3daytrade_optional": {
+          "enabled": False,
+          "rule_if_then": [
+            "IF trend is very strong into the Close AND close is near high_of_day (for long) or low_of_day (for short) AND higher timeframe (daily) supports continuation THEN allow overnight hold with reduced size and wider stop based on daily structure. [file:8]"
+          ]
+        }
+      }
+    },
+
+    "position_sizing": {
+      "risk_unit_definition": "R = |entry_price - stop_price|.",
+      "per_trade_risk_pct": 0.005,
+      "sizing_rule": [
+        "per_trade_dollar_risk = account_equity * per_trade_risk_pct.",
+        "shares_or_contracts = floor(per_trade_dollar_risk / R).",
+        "Cap size by liquidity: shares <= max_pct_of_1min_volume * avg_1min_volume_near_entry."
+      ],
+      "time_of_day_modifiers": {
+        "open_window_multiplier": 1.0,
+        "midday_multiplier": 0.5,
+        "close_window_multiplier": 0.75
+      },
+      "portfolio_limits": {
+        "max_open_positions": 5,
+        "max_sector_exposure_pct": 0.25,
+        "max_daily_drawdown_pct": 0.03
+      }
+    },
+
+    "parameters_to_optimize": {
+      "min_gap_pct": [1.5, 3.0, 5.0],
+      "min_range_multiple": [1.5, 2.0, 3.0],
+      "vol_multiple": [2.0, 3.0, 5.0],
+      "per_trade_risk_pct": [0.003, 0.005, 0.01],
+      "stop_buffer_pct": [0.0005, 0.001, 0.002],
+      "first_R_multiple": [1.0, 1.5, 2.0],
+      "partial_take_pct": [0.33, 0.5, 0.66],
+      "time_windows_minutes": {
+        "open": [60, 90],
+        "midday": [[90, 210], [90, 240]],
+        "close": [60, 90]
+      }
+    }
+  }
+}
